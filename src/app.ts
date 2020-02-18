@@ -2,7 +2,7 @@ import express from "express";
 const app = express();
 import bodyParser from "body-parser";
 
-import {Account} from "./account";
+import {Account, isReport} from "./account";
 
 import {Debit} from "./transactions/debit"
 import {Credit} from "./transactions/credit"
@@ -28,14 +28,19 @@ app.post('/debits', (req, res) => {
 
         const amount = (req.body && req.body.amount && parseInt(req.body.amount)) ? parseInt(req.body.amount) : undefined;
 
-        if(!amount){
-            const errorResponse: ErrorResponse = {code: 400, message: "amount param is required"};
+        if(!amount || amount < 0){
+            const errorResponse: ErrorResponse = {code: 400, message: "amount param is required and have to be positive"};
             return res.status(400).json(errorResponse);
         }
 
-        account.setDebit(
+        const result = account.setDebit(
             new Debit({amount})
         );
+
+        if(!result.success || amount < 0){
+            const errorResponse: ErrorResponse = {code: 403, message: result.message};
+            res.status(403).json(errorResponse);
+        }
 
         return res.status(201).send(); //Successfully added
 
@@ -54,7 +59,7 @@ app.post('/credits', function (req, res) {
         const amount = (req.body && req.body.amount && parseInt(req.body.amount)) ? parseInt(req.body.amount) : undefined;
 
         if(!amount){
-            const errorResponse: ErrorResponse = {code: 400, message: "amount param is required"}
+            const errorResponse: ErrorResponse = {code: 400, message: "amount param is required and have to be positive"};
             return res.status(400).json(errorResponse);
         }
 
@@ -62,7 +67,7 @@ app.post('/credits', function (req, res) {
             new Credit({amount})
         );
 
-        if(!result.success){
+        if(!result.success || amount < 0){
             const errorResponse: ErrorResponse = {code: 403, message: result.message};
             res.status(403).json(errorResponse);
         }
@@ -82,7 +87,15 @@ app.post('/credits', function (req, res) {
 
 app.get("/accounts", function(req, res){
     try{
-        return res.status(200).json({ balance: account.balance });
+
+        const result = account.getBalance();
+
+        if(isReport(result) && !result.success){
+            const errorResponse: ErrorResponse = {code: 403, message: result.message};
+            res.status(403).json(errorResponse);
+        }
+
+        return res.status(200).json({ balance: result });
     }
     catch(error){
         console.error(error);
@@ -91,10 +104,18 @@ app.get("/accounts", function(req, res){
     }
 });
 
-// Set credit
+// Get credit
 app.get('/credits', function (req, res) {
     try{
-        return res.status(200).json(account.getCredits());
+
+        const result = account.getCredits();
+
+        if(isReport(result) && !result.success){
+            const errorResponse: ErrorResponse = {code: 403, message: result.message};
+            res.status(403).json(errorResponse);
+        }
+
+        return res.status(200).json(result);
     }
     catch(error){
         console.error(error);
@@ -103,10 +124,17 @@ app.get('/credits', function (req, res) {
     }
 });
 
-// Set debit
+// Get debit
 app.get('/debits', function (req, res) {
     try{
-        return res.status(200).json(account.getDebits());
+        const result = account.getDebits();
+
+        if(isReport(result) && !result.success){
+            const errorResponse: ErrorResponse = {code: 403, message: result.message};
+            res.status(403).json(errorResponse);
+        }
+
+        return res.status(200).json(result);
     }
     catch(error){
         console.error(error);
